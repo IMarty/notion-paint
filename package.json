@@ -1,0 +1,20 @@
+{
+    "name": "pie_test",
+    "version": "1.0.0",
+    "description": "",
+    "main": "test.js",
+    "dependencies": {
+        "body-parser": "^1.15.2",
+        "express": "^4.14.0",
+        "express3-handlebars": "^0.5.2",
+        "method-override": "^2.3.6",
+        "redis": "^2.6.2"
+    },
+    "devDependencies": {},
+    "scripts": {
+        "start": "cd server && node ./bin/start.js && cd ..",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "license": "ISC"
+}
