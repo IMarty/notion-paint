@@ -196,6 +196,7 @@ var Menu = function() {
                 }
             })
             .attr("fill", "gray")
+            .attr("style", style({"pointer-events": "none"}))
 
         exit.append("image")
             .attr("width", 20)
@@ -316,9 +317,7 @@ d3.select(c).on("mouseup", function() {
     mouseIsDown = false;
 });
 
-
 $(document).ready( function(){
-    //Get the canvas &
     var c = $('#canvas');
     var ct = c.get(0).getContext('2d');
     var container = $(c).parent();
@@ -335,7 +334,6 @@ $(document).ready( function(){
 
     //Initial call 
     respondCanvas();
-
 }); 
 
 
