@@ -39,8 +39,6 @@ var Menu = function() {
     var menuElement = createMenu();
 
     function createMenu() {
-        // Data
-        var MENU_CHILD_CLASS = "menuChildClass";
         var width = menuAttrs.width;
         var height = menuAttrs.height;
 
@@ -81,16 +79,16 @@ var Menu = function() {
             }
         });
 
-        var actions = ["undo", "redo"];
-
+        var actions = [{id: "undo" , url: "/undo.svg"},{id: "redo", url: "/redo.svg"}];
+        
         var actionData = _.map(actions, function(action) {    
-            return {
+            return _.extend(action, {
                 tag: "action",
                 fill: nonColorOptionColor,
                 size: (totalPie * .25) / actions.length,
-                id: action
-            }
-        }); 
+                displaySize: 15
+            });
+        });
 
         var menuData = colorData.concat(sizeData, actionData);
 
@@ -155,22 +153,6 @@ var Menu = function() {
                .attr("in", "offsetBlur")
         feMerge.append("feMergeNode")
                .attr("in", "SourceGraphic");
-        
-        
-        function renderIconAtCentroid(pieDatum, iconLink) {
-            var centroidPoint = menuArc.centroid(pieDatum);
-            
-            var iconWidth = 15;
-            var iconHeight = 15;
-
-            menu.append("image")
-                .attr("width", iconWidth)
-                .attr("height", iconHeight)
-                .attr("href", iconLink)
-                .attr("x", function (d) { return centroidPoint[0] - (iconWidth/2) })
-                .attr("y", function (d) { return centroidPoint[1] - (iconHeight/2) })
-                .attr("class", "actions");            
-        }
 
         // Inner exit button
         exit.selectAll("path.exit")
@@ -189,9 +171,11 @@ var Menu = function() {
             .attr("href", "/exit.svg")
             .attr("x", 0 - (20/2))
             .attr("y", 0 - (20/2))
-            .attr("style", style({"pointer-events": "none"}));
+            .style("pointer-events", "none")
 
-        menu.selectAll("path.menu")
+
+        var menuPieSlices = menu.append("g");
+        var sectionPieSlices = menuPieSlices.selectAll("path.menu")
             .data(pie(menuData))
             .enter()
             .append("g")
@@ -217,6 +201,16 @@ var Menu = function() {
                 activateActiveSections(activeSections);
             });
 
+        // draw undo redo icons
+        sectionPieSlices.filter(function (d) { return d.data.id === "redo" || d.data.id === "undo"; })
+                        .append("image")
+                        .attr("width", function (d) { return d.data.displaySize; })
+                        .attr("height", function (d) { return d.data.displaySize; })
+                        .attr("href", function (d) { return d.data.img; })
+                        .attr("x", function (d) { return menuArc.centroid(d)[0] - (iconWidth/2) })
+                        .attr("y", function (d) { return menuArc.centroid(d)[1] - (iconHeight/2) })
+                        .attr("class", "actions");            
+
         function activateActiveSections(activeSections) {
             _.forEach(activeSections, function (cl, tag) {
                 d3.select("." + makeValidSelector(cl))
@@ -226,41 +220,28 @@ var Menu = function() {
             });    
         }
 
-        var sizeData = pie(menuData).forEach(function(menuDatum) {
-            var d = menuDatum;
-            if(menuDatum.data.tag === "size") {
-                d3.select("g." + makeValidSelector(d.data.id))
-                  .append("circle")
-                  .attr("cx", function (d) {
-                      return menuArc.centroid(d)[0];
-                  })
-                  .attr("cy", function (d) {
-                      return menuArc.centroid(d)[1];
-                  })
-                  .attr("r", function (d) {
-                      if (d.data.id === "tiny") {
-                          return 2
-                      } else if (d.data.id === "small") {
-                          return 4
-                      } else if (d.data.id === "medium") {
-                          return 7
-                      } else if (d.data.id === "large") {
-                          return 12
-                      }
-                  })
-                  .attr("fill", "gray")
-                  .attr("style", style({"pointer-events": "none"}))        
-            }
-        });
-
-        //Render undo icon
-        renderIconAtCentroid(pie(menuData).find(function(val) {
-            return val.data.id === "undo";
-        }), '/undo.svg');
-
-        renderIconAtCentroid(pie(menuData).find(function(val) {
-            return val.data.id === "redo";
-        }), '/redo.svg');
+        // Draw size circles
+        sectionPieSlices.filter(function(d) { return d.data.tag === "size"; })
+                        .append("circle")
+                        .attr("cx", function (d) {
+                            return menuArc.centroid(d)[0];
+                        })
+                        .attr("cy", function (d) {
+                            return menuArc.centroid(d)[1];
+                        })
+                        .attr("r", function (d) {
+                            if (d.data.id === "tiny") {
+                                return 2
+                            } else if (d.data.id === "small") {
+                                return 4
+                            } else if (d.data.id === "medium") {
+                                return 7
+                            } else if (d.data.id === "large") {
+                                return 12
+                            }
+                        })
+                        .attr("fill", "gray")
+                        .style("pointer-events", "none")        
 
         // Draw border
         menu.append("circle")
@@ -288,26 +269,16 @@ var Menu = function() {
             .attr("stroke", "gray")
             .attr("stroke-width", 1)
 
-        function reorder(parent) {
-            console.log(parent);
-            parent.sort(function () {
-                console.log(arguments);
-            });
-        }
-        
         activateActiveSections(activeSections);
-        reorder(menu);
 
         return svg;
     }
 
     function openMenu(x, y) {
-        menuElement.attr("style", style({
-            display: "block",
-            position: "absolute",
-            left: (x - menuAttrs.width/2) + "px",
-            top: (y - menuAttrs.height/2) + "px"
-        }));
+        menuElement.style("display", "block")
+                   .style("position", "absolute")
+                   .style("left", (x - menuAttrs.width/2) + "px")
+                   .style("top", (y - menuAttrs.height/2) + "px");
     }
 
     function hideMenu() {
