@@ -317,6 +317,11 @@ var backCanvasEl = document.getElementById('backCanvas');
 var frontCtx = frontCanvasEl.getContext("2d");
 var backCtx = backCanvasEl.getContext("2d");
 
+// indexes line up between these
+var strokes = [];
+var menuData = [];
+var canvasSizes = [];
+
 var points = [];
 
 function drawCircle(ctx, cx, cy, r, color) {
@@ -361,12 +366,22 @@ d3.select(frontCanvasEl).on("mousedown", function() {
 d3.select(frontCanvasEl).on("mouseup", function() {
     mouseIsDown = false;
     drawLineToCanvas(backCtx, points, menu, false);
+    canvasSizes.push(canvasWidth);
+    menuData.push(menu);
+    strokes.push(points);
     points = [];
+    drawLineToCanvas(frontCtx, points, menu, true);
 });
 
-function drawLineToCanvas(ctx, linePoints, menu, shouldClear) {
+function drawLineToCanvas(ctx, linePoints, menu, shouldClear, windowSize) {
+    //TD: should change this to greatest width
+    var scale = 1;
+    if (windowSize) {
+        scale = canvasWidth/windowSize; 
+    }
+
     if (shouldClear) {
-        ctx.clearRect(0, 0, $(document).width(), $(document).height());
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     }
 
     var sizeToPixels = {
@@ -381,8 +396,10 @@ function drawLineToCanvas(ctx, linePoints, menu, shouldClear) {
         lineCap: "round",
         lineWidth: sizeToPixels[menu.activeSections.size]
     }
+    ctx.save();
+    ctx.scale(scale, scale);
 
-    ctx.beginPath()
+    ctx.beginPath();
     _.forEach(attrs, function (value, name) {
         ctx[name] = value;
     });
@@ -397,7 +414,11 @@ function drawLineToCanvas(ctx, linePoints, menu, shouldClear) {
 
     ctx.stroke();
     ctx.closePath();
+    ctx.restore();
 }
+
+var canvasWidth;
+var canvasHeight;
 
 $(document).ready( function(){
     var front = $(frontCanvas);
@@ -413,14 +434,24 @@ $(document).ready( function(){
     $(window).resize( respondCanvas );
 
     function respondCanvas(){
-        var w = $(container).width();
-        var h = $(container).height();
-        front.attr('width', w); //max width
-        front.attr('height', h); //max height
+        canvasWidth = $(container).width();
+        canvasHeight = $(container).height();
+        front.attr('width', canvasWidth); //max width
+        front.attr('height', canvasHeight); //max height
 
-        back.attr('width', w); //max width
-        back.attr('height', h); //max height
-        //Call a function to redraw other content (texts, images etc)
+        back.attr('width', canvasWidth); //max width
+        back.attr('height', canvasHeight); //max height
+
+        if (resizeTimer) {
+            clearTimeout(resizeTimer);
+        }
+        
+        var resizeTimer = setTimeout(function() {
+            // Run code here, resizing has "stopped"
+            strokes.forEach(function(points, ind) {
+                drawLineToCanvas(backCtx, points, menuData[ind], false, canvasSizes[ind]);
+            });
+        }, 200);
     }
 
     //Initial call 
@@ -434,4 +465,9 @@ $(document).ready( function(){
      svg for menu blocks click to canvas
      leaving with mouse down bug
 
+   don't like the global height width thing;
+
+   possible settings things:
+
+   - turn to image (they could just take a picture)
 */
