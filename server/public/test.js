@@ -79,7 +79,7 @@ var Menu = function() {
             }
         });
 
-        var actions = [{id: "undo" , url: "/undo.svg"},{id: "redo", url: "/redo.svg"}];
+        var actions = [{id: "undo" , imgUrl: "/undo.svg"},{id: "redo", imgUrl: "/redo.svg"}];
         
         var actionData = _.map(actions, function(action) {    
             return _.extend(action, {
@@ -173,42 +173,40 @@ var Menu = function() {
             .attr("y", 0 - (20/2))
             .style("pointer-events", "none")
 
-
         var menuPieSlices = menu.append("g");
-        var sectionPieSlices = menuPieSlices.selectAll("path.menu")
-            .data(pie(menuData))
-            .enter()
-            .append("g")
-            .attr("class", function (obj) {
-                return makeValidSelector(obj.data.id);
-            })
-            .append("path")
-            .attr("d", menuArc)            
-            .attr("fill", function(obj) {
-                return obj.data.fill;
-            })
-            .on("click", function(obj) {
-                // Handle Events
-                if (obj.data.tag === "action") {
-                    return false;
-                }
+        var sectionPieSliceGroups = menuPieSlices.selectAll("path.menu")
+                                                 .data(pie(menuData))
+                                                 .enter()
+                                                 .append("g");
 
-                activeSections[obj.data.tag] = obj.data.id;
-                d3.selectAll(".active")
-                  .classed("active", false)
-                  .style("filter", null);
+        sectionPieSliceGroups.attr("class", function (obj) { return makeValidSelector(obj.data.id); })
+                             .append("path")
+                             .attr("d", menuArc)            
+                             .attr("fill", function(obj) {
+                                 return obj.data.fill;
+                             })
+                             .on("click", function(obj) {
+                                 // Handle Events
+                                 if (obj.data.tag === "action") {
+                                     return false;
+                                 }
 
-                activateActiveSections(activeSections);
-            });
+                                 activeSections[obj.data.tag] = obj.data.id;
+                                 d3.selectAll(".active")
+                                   .classed("active", false)
+                                   .style("filter", null);
+
+                                 activateActiveSections(activeSections);
+                             });
 
         // draw undo redo icons
-        sectionPieSlices.filter(function (d) { return d.data.id === "redo" || d.data.id === "undo"; })
+        sectionPieSliceGroups.filter(function (d) { return d.data.id === "redo" || d.data.id === "undo"; })
                         .append("image")
                         .attr("width", function (d) { return d.data.displaySize; })
                         .attr("height", function (d) { return d.data.displaySize; })
-                        .attr("href", function (d) { return d.data.img; })
-                        .attr("x", function (d) { return menuArc.centroid(d)[0] - (iconWidth/2) })
-                        .attr("y", function (d) { return menuArc.centroid(d)[1] - (iconHeight/2) })
+                        .attr("href", function (d) { return d.data.imgUrl; })
+                        .attr("x", function (d) { return menuArc.centroid(d)[0] - (d.data.displaySize/2); })
+                        .attr("y", function (d) { return menuArc.centroid(d)[1] - (d.data.displaySize/2); })
                         .attr("class", "actions");            
 
         function activateActiveSections(activeSections) {
@@ -219,9 +217,8 @@ var Menu = function() {
                   .moveToFront();
             });    
         }
-
-        // Draw size circles
-        sectionPieSlices.filter(function(d) { return d.data.tag === "size"; })
+        
+        sectionPieSliceGroups.filter(function(d) { return d.data.tag === "size"; })
                         .append("circle")
                         .attr("cx", function (d) {
                             return menuArc.centroid(d)[0];
@@ -432,14 +429,9 @@ $(document).ready( function(){
 
 
 /*
-  How to write better d3 code:
-   understand how to grab data better
-   use the classed module more frequently
-   understand the whole api
-
-   I suspect all my d3 maps and forEacheas are bad code and could be done with selection and chaining + putting arguments on the data 
-   I should do a pass at rewriting...
-
-   What can and cannot be chained in d3?
+   bugs:
+     menu on the side causes scroll
+     svg for menu blocks click to canvas
+     leaving with mouse down bug
 
 */
