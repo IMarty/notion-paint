@@ -1,24 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-/**
- * Normalize a port into a number, string, or false.
- */
-function normalizePort(val) {
-    var port = parseInt(val, 10);
-
-    if (isNaN(port)) {
-        // named pipe
-        return val;
-    }
-
-    if (port >= 0) {
-        // port number
-        return port;
-    }
-
-    return false;
-}
+var debug = require("debug")("express:server");
 
 /**
  * Event listener for HTTP server "error" event.
@@ -58,21 +41,7 @@ function onListening() {
     debug("Listening on " + bind);
 }
 
-//module dependencies.
-var app = require("../app.js");
-
-var debug = require("debug")("express:server");
-var http = require("http");
-
-//get port from environment and store in Express.
-var port = normalizePort(process.env.PORT || 8080);
-app.set("port", port);
-
-//create http server
-var server = http.createServer(app);
-
-//listen on provided ports
-server.listen(port);
+var server = require("../app.js");
 
 //add error handler
 server.on("error", onError);

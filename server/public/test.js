@@ -3,11 +3,27 @@
  */
 
 // write arc data creator function
-function style(styles) {
-    return _.reduce(styles, function(styleStr, value, key) {
-        return styleStr + key + ": " + value + ";";
-    }, '');
-}
+var socket = io();
+
+var frontCanvasEl = document.getElementById('frontCanvas');
+var backCanvasEl = document.getElementById('backCanvas');
+
+var frontCtx = frontCanvasEl.getContext("2d");
+var backCtx = backCanvasEl.getContext("2d");
+
+// indexes line up between these
+var strokes = [];
+var menuData = [];
+var canvasSizes = [];
+
+var points = [];
+
+socket.on("initialData", function (data) {
+    JSON.parse(data);
+});
+
+// improve with regex
+socket.emit("getInitialData", window.location.pathname.split("/")[2]);
 
 function translate(x, y) {
     return "translate(" + x + ", " + y + ")";
@@ -106,7 +122,7 @@ var Menu = function() {
         // Create Top Level Elements
         var body = d3.select("body");
         var svg = body.append("svg")
-                      .attr("style", style({display: "none"}))
+                      .style("display", "none")
                       .attr("width", width)
                       .attr("height", height);
 
@@ -279,7 +295,7 @@ var Menu = function() {
     }
 
     function hideMenu() {
-        menuElement.attr("style", style({display: "none"}));
+        menuElement.style("display", "none");
     }
 
     return {
@@ -311,18 +327,7 @@ d3.select("body").on("contextmenu", function() {
     return false;
 });
 
-var frontCanvasEl = document.getElementById('frontCanvas');
-var backCanvasEl = document.getElementById('backCanvas');
 
-var frontCtx = frontCanvasEl.getContext("2d");
-var backCtx = backCanvasEl.getContext("2d");
-
-// indexes line up between these
-var strokes = [];
-var menuData = [];
-var canvasSizes = [];
-
-var points = [];
 
 function drawCircle(ctx, cx, cy, r, color) {
     ctx.beginPath();
