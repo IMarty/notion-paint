@@ -12,18 +12,22 @@ var frontCtx = frontCanvasEl.getContext("2d");
 var backCtx = backCanvasEl.getContext("2d");
 
 // indexes line up between these
-var strokes = [];
-var menuData = [];
-var canvasSizes = [];
-
+// {points: [[x, y], []], attrs: {}, size: size};
+var strokeData = [];
 var points = [];
 
-socket.on("initialData", function (data) {
-    JSON.parse(data);
-});
+var myStrokeIds = [];
+var redoStrokes = [];
 
-// improve with regex
-socket.emit("getInitialData", window.location.pathname.split("/")[2]);
+function guid() {
+    function s4() {
+        return Math.floor((1 + Math.random()) * 0x10000)
+                   .toString(16)
+                   .substring(1);
+    }
+    return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+           s4() + '-' + s4() + s4() + s4();
+}
 
 function translate(x, y) {
     return "translate(" + x + ", " + y + ")";
@@ -39,6 +43,56 @@ d3.selection.prototype.moveToFront = function() {
         this.parentNode.appendChild(this);
     });
 };
+
+/* Actions */
+var stateActions = {
+    emit: function () {
+        // Adds uuid as first param to emit
+        var args = _.toArray(arguments);
+        var uuid = window.location.pathname.split("/")[2];
+        socket.emit.apply(socket, [_.first(args), uuid].concat(_.tail(args)));  
+    },
+    getInitialData: function () {
+        this.emit("getInitialData");
+    },
+    paint: function (strokeDatum) {
+        if (!strokeDatum.id) {
+            strokeDatum.id = guid();
+        }
+        
+        strokeData.push(strokeDatum);
+        points = [];
+        drawLineToCanvas(frontCtx, points, menu.activeSections, true);        
+        redoStrokes = [];
+        myStrokeIds.push(strokeDatum.id);
+        this.emit("paint", strokeDatum);
+    },
+    undo: function () {        
+        var id = myStrokeIds.pop();
+        var strokeDatum = _.remove(strokeData, function(strokeDatum) {
+            return strokeDatum.id === id;
+        })[0];
+        
+        redoStrokes.push(strokeDatum);
+        reloadCanvas();
+        this.emit("undo", strokeDatum.id);
+        
+    },
+    redo: function () {
+        if (redoStrokes.length) {
+            this.paint(redoStrokes.pop());
+        }
+    }
+}
+
+stateActions.getInitialData();
+
+/* Listeners */
+socket.on("serverImageData", function (data) {
+    strokeData = JSON.parse(data).imageData;
+    console.log("strokeData", strokeData);
+    reloadCanvas();
+});
 
 var Menu = function() {
     var size = 150;
@@ -203,27 +257,30 @@ var Menu = function() {
                              })
                              .on("click", function(obj) {
                                  // Handle Events
-                                 if (obj.data.tag === "action") {
-                                     return false;
-                                 }
+                                 if (obj.data.id === "undo") {
+                                     stateActions.undo();
+                                 } else if (obj.data.id === "redo") {
+                                     stateActions.redo();
+                                 } else {
+                                     activeSections[obj.data.tag] = obj.data.id;
+                                     d3.selectAll(".active")
+                                       .classed("active", false)
+                                       .style("filter", null);
 
-                                 activeSections[obj.data.tag] = obj.data.id;
-                                 d3.selectAll(".active")
-                                   .classed("active", false)
-                                   .style("filter", null);
-
-                                 activateActiveSections(activeSections);
+                                     activateActiveSections(activeSections);    
+                                 }                                
                              });
 
         // draw undo redo icons
         sectionPieSliceGroups.filter(function (d) { return d.data.id === "redo" || d.data.id === "undo"; })
-                        .append("image")
-                        .attr("width", function (d) { return d.data.displaySize; })
-                        .attr("height", function (d) { return d.data.displaySize; })
-                        .attr("href", function (d) { return d.data.imgUrl; })
-                        .attr("x", function (d) { return menuArc.centroid(d)[0] - (d.data.displaySize/2); })
-                        .attr("y", function (d) { return menuArc.centroid(d)[1] - (d.data.displaySize/2); })
-                        .attr("class", "actions");            
+                             .append("image")
+                             .attr("width", function (d) { return d.data.displaySize; })
+                             .attr("height", function (d) { return d.data.displaySize; })
+                             .attr("href", function (d) { return d.data.imgUrl; })
+                             .attr("x", function (d) { return menuArc.centroid(d)[0] - (d.data.displaySize/2); })
+                             .attr("y", function (d) { return menuArc.centroid(d)[1] - (d.data.displaySize/2); })
+                             .attr("class", "actions")
+                             .style("pointer-events", "none");
 
         function activateActiveSections(activeSections) {
             _.forEach(activeSections, function (cl, tag) {
@@ -327,8 +384,6 @@ d3.select("body").on("contextmenu", function() {
     return false;
 });
 
-
-
 function drawCircle(ctx, cx, cy, r, color) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, 2*Math.PI);
@@ -342,10 +397,9 @@ d3.select(frontCanvasEl).on("mousemove", function() {
     var e = d3.event;
     if (mouseIsDown) {
         points.push([e.clientX, e.clientY]);
-        drawLineToCanvas(frontCtx, points, menu, true);
+        drawLineToCanvas(frontCtx, points, menu.activeSections, true);
     }
 });
-
 
 d3.select(frontCanvasEl).on("mousedown", function() {
     var e = d3.event;
@@ -364,21 +418,28 @@ d3.select(frontCanvasEl).on("mousedown", function() {
     } else {
         mouseIsDown = true;
         points.push([e.clientX, e.clientY]);
-        drawLineToCanvas(frontCtx, points, menu, true);
+        drawLineToCanvas(frontCtx, points, menu.activeSections, true);
     }
 });
 
-d3.select(frontCanvasEl).on("mouseup", function() {
-    mouseIsDown = false;
-    drawLineToCanvas(backCtx, points, menu, false);
-    canvasSizes.push(canvasWidth);
-    menuData.push(menu);
-    strokes.push(points);
-    points = [];
-    drawLineToCanvas(frontCtx, points, menu, true);
-});
+function onMouseUp() {
+    if (mouseIsDown) {
+        mouseIsDown = false;
+        drawLineToCanvas(backCtx, points, menu.activeSections, false);
+        var strokeDatum = {
+            attrs: _.clone(menu.activeSections),
+            size: canvasWidth,
+            points: points
+        };
 
-function drawLineToCanvas(ctx, linePoints, menu, shouldClear, windowSize) {
+        stateActions.paint(strokeDatum);
+    }
+}
+
+d3.select(frontCanvasEl).on("mouseup", onMouseUp);
+d3.select("body").on("mouseleave", onMouseUp);
+
+function drawLineToCanvas(ctx, linePoints, activeSections, shouldClear, windowSize) {
     //TD: should change this to greatest width
     var scale = 1;
     if (windowSize) {
@@ -397,9 +458,9 @@ function drawLineToCanvas(ctx, linePoints, menu, shouldClear, windowSize) {
     };
 
     var attrs = {
-        strokeStyle: menu.activeSections.color,
+        strokeStyle: activeSections.color,
         lineCap: "round",
-        lineWidth: sizeToPixels[menu.activeSections.size]
+        lineWidth: sizeToPixels[activeSections.size]
     }
     ctx.save();
     ctx.scale(scale, scale);
@@ -425,7 +486,14 @@ function drawLineToCanvas(ctx, linePoints, menu, shouldClear, windowSize) {
 var canvasWidth;
 var canvasHeight;
 
-$(document).ready( function(){
+function reloadCanvas() {
+    backCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    strokeData.forEach(function(strokeDatum, ind) {
+        drawLineToCanvas(backCtx, strokeDatum.points, strokeDatum.attrs, false, strokeDatum.size);
+    });
+}
+
+$(document).ready(function(){
     var front = $(frontCanvas);
     var back = $(backCanvas);
 
@@ -451,12 +519,7 @@ $(document).ready( function(){
             clearTimeout(resizeTimer);
         }
         
-        var resizeTimer = setTimeout(function() {
-            // Run code here, resizing has "stopped"
-            strokes.forEach(function(points, ind) {
-                drawLineToCanvas(backCtx, points, menuData[ind], false, canvasSizes[ind]);
-            });
-        }, 200);
+        var resizeTimer = setTimeout(reloadCanvas, 200);
     }
 
     //Initial call 
@@ -465,10 +528,26 @@ $(document).ready( function(){
 
 
 /*
-   bugs:
-     menu on the side causes scroll
-     svg for menu blocks click to canvas
-     leaving with mouse down bug
+   need to refactor this with a render method for the data
+   reorg things are kinda global and messy
+
+
+   The next thing:
+     - read up on socket io and redis and see how the broadcasting should be implemented (I think rooms)
+
+
+   Things to do:
+     - Collab editing
+     - See cursor
+     - Set data to background picture
+     - Fix ordering of menu
+     - Fix height and width
+     - Add a border that looks good in notion
+     - Add right click for menu text
+     - Deploy onto server
+     - Make landing page
+     - Gray out if can't undo or redo
+     - Change drawing algo to not skip no matter how much time is spent drawing
 
    don't like the global height width thing;
 
@@ -476,3 +555,9 @@ $(document).ready( function(){
 
    - turn to image (they could just take a picture)
 */
+
+
+
+
+
+

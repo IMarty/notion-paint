@@ -77,16 +77,44 @@ var io = require('socket.io')(server);
 var redisSocket = require('socket.io-redis');
 io.adapter(redisSocket({ host: 'localhost', port: 6379 }));
 
+function getPaintingFromRedis(hash, callback) {
+    client.get(hash, function (idk, data) {
+        callback(JSON.parse(data));
+    });
+}
+
 io.on('connection', function(socket){
     socket.on('getInitialData', function(hash) {
+        socket.join(hash);
         client.get(hash, function (idk, data) {
-            socket.emit('initialData', data);
+            socket.emit('serverImageData', data);
+        });
+    });
+
+    socket.on('paint', function (hash, strokeDatum) {
+        getPaintingFromRedis(hash, function(data) {
+            data.imageData.push(strokeDatum);
+            var jsonData = JSON.stringify(data);
+            client.set(hash, jsonData);
+            io.to(hash).emit('serverImageData', jsonData);
+        });
+    });
+
+    socket.on('undo', function (hash, undoId) {
+        getPaintingFromRedis(hash, function(data) {
+            for (var i = data.imageData.length - 1; i > -1; i--) {
+                if(data.imageData[i].id === undoId) {
+                    data.imageData.splice(i, 1);
+                    break;
+                }
+            }
+            
+            var jsonData = JSON.stringify(data);
+            client.set(hash, jsonData);
+            io.to(hash).emit('serverImageData', jsonData);
         });
     });
 });
-
-
-
 
 //listen on provided ports
 server.listen(port);
