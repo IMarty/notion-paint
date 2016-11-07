@@ -29,6 +29,10 @@ svg > * {
   pointer-events: visiblePainted;
 }
 
+svg.cursor > * {
+  pointer-events: none;
+}
+
 #frontCanvas {
   z-index: 1;
 }

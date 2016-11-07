@@ -399,6 +399,8 @@ d3.select(frontCanvasEl).on("mousemove", function() {
         points.push([e.clientX, e.clientY]);
         drawLineToCanvas(frontCtx, points, menu.activeSections, true);
     }
+    /* if want to draw the cursor  */
+    /*     drawCursor(e.clientX, e.clientY,  sizeToPixels[menu.activeSections.size], menu.activeSections.color);*/
 });
 
 d3.select(frontCanvasEl).on("mousedown", function() {
@@ -436,6 +438,13 @@ function onMouseUp() {
     }
 }
 
+var sizeToPixels = {
+    tiny: 3,
+    small: 8,
+    medium: 16,
+    large: 64
+};
+
 d3.select(frontCanvasEl).on("mouseup", onMouseUp);
 d3.select("body").on("mouseleave", onMouseUp);
 
@@ -449,13 +458,6 @@ function drawLineToCanvas(ctx, linePoints, activeSections, shouldClear, windowSi
     if (shouldClear) {
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     }
-
-    var sizeToPixels = {
-        tiny: 3,
-        small: 8,
-        medium: 16,
-        large: 64
-    };
 
     var attrs = {
         strokeStyle: activeSections.color,
@@ -481,6 +483,33 @@ function drawLineToCanvas(ctx, linePoints, activeSections, shouldClear, windowSi
     ctx.stroke();
     ctx.closePath();
     ctx.restore();
+}
+
+function drawCursor(mx, my, size, color) {
+    var cursor = d3.select("svg.cursor");
+    var cursorCircle = d3.select("circle.cursor");
+
+    if (cursor.empty()) {
+        cursor = d3.select("body")
+                   .append("svg")
+                   .classed("cursor", true)
+                   .style("position", "absolute")
+                   .style("pointer-events", "none")
+
+        cursorCircle = cursor.append("circle")
+                             .classed("cursor", true);
+                   
+    }
+
+    cursor.attr("width", size)
+          .attr("height", size)
+          .style("left", mx - size/2)
+          .style("top", my - size/2)
+
+    cursorCircle.attr("cx", size/2)
+                .attr("cy", size/2)
+                .attr("fill", color)
+                .attr("r", size/2);
 }
 
 var canvasWidth;
@@ -528,32 +557,21 @@ $(document).ready(function(){
 
 
 /*
-   need to refactor this with a render method for the data
-   reorg things are kinda global and messy
-
-
-   The next thing:
-     - read up on socket io and redis and see how the broadcasting should be implemented (I think rooms)
-
-
    Things to do:
-     - Collab editing
-     - See cursor
-     - Set data to background picture
-     - Fix ordering of menu
-     - Fix height and width
-     - Add a border that looks good in notion
-     - Add right click for menu text
-     - Deploy onto server
-     - Make landing page
-     - Gray out if can't undo or redo
-     - Change drawing algo to not skip no matter how much time is spent drawing
+   
+   - Fix ordering of menu
+   - Fix height and width
+   - Add a border that looks good in notion
+   - Add right click for menu text
+   - Make landing page
+   - Gray out if can't undo or redo
+   - Change drawing algo to not skip no matter how much time is spent drawing
+   - Fix menu 
+   - Add animations to menu
+   - Deploy onto server
+   - Set data to background picture
+   - Refactor globals in code
 
-   don't like the global height width thing;
-
-   possible settings things:
-
-   - turn to image (they could just take a picture)
 */
 
 
