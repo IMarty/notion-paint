@@ -1,5 +1,6 @@
 <html>
     <head>
+        <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
         <link rel="stylesheet" href="https://unpkg.com/tachyons@4.5.3/css/tachyons.min.css"/>
         <link rel="stylesheet" type="text/css" href="/style.css">
         <script
@@ -7,8 +8,36 @@
             integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
             crossorigin="anonymous"></script>
     </head>
-    <body>
-        <a id="newCanvas" href="" >New</a>
+    <body class="homepage pa4">
+        <h1 class="f1 mb3">Paint Block 🎨</h1>
+        <h2 class="f2 mb3">An unofficial collaborative paint block for <a class="link" href="https://www.notion.so">Notion</a>.</h2>
+
+        <div class="cf">
+            <div class="fl w-50">
+                <ul class="mv3 bullets f4">
+                    <li>Collaborative Editing</li>
+                    <li>Responsize Sizing</li>
+                    <li>Undo/Redo</li>
+                </ul>
+                <a id="newCanvas" class="button dib mv3" href="" >Create New Block</a>
+            </div>
+            <div class="fr w-50">
+                <img class="bigImage" src="/paint-block-example.png">
+            </div>
+        </div>        
+        <h3 class="f3">How to use:</h3>
+        <div class="flex">
+            <div class="">
+                <img class="smallImage" src="/paint-block-example.png">
+            </div>
+            <div class="">
+                <img class="smallImage" src="/paint-block-example.png">
+            </div>
+            <div class="">
+                <img class="smallImage" src="/paint-block-example.png">
+            </div>
+        </div>
+        
         <script>
          $("#newCanvas").click(function() {
              $.post("/api/new", function(data) {

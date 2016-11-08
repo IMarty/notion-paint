@@ -44,6 +44,15 @@ d3.selection.prototype.moveToFront = function() {
     });
 };
 
+d3.selection.prototype.moveToBack = function() {  
+    return this.each(function() { 
+        var firstChild = this.parentNode.firstChild; 
+        if (firstChild) { 
+            this.parentNode.insertBefore(this, firstChild); 
+        } 
+    });
+};
+
 /* Actions */
 var stateActions = {
     emit: function () {
@@ -55,32 +64,37 @@ var stateActions = {
     getInitialData: function () {
         this.emit("getInitialData");
     },
-    paint: function (strokeDatum) {
+    paint: function (strokeDatum, shouldClearRedoStrokes) {        
         if (!strokeDatum.id) {
             strokeDatum.id = guid();
         }
         
         strokeData.push(strokeDatum);
         points = [];
-        drawLineToCanvas(frontCtx, points, menu.activeSections, true);        
-        redoStrokes = [];
+        drawLineToCanvas(frontCtx, points, menu.activeSections, true);
+
+        if (shouldClearRedoStrokes || shouldClearRedoStrokes === undefined) {
+            redoStrokes = [];
+        }
+        
         myStrokeIds.push(strokeDatum.id);
         this.emit("paint", strokeDatum);
     },
-    undo: function () {        
-        var id = myStrokeIds.pop();
-        var strokeDatum = _.remove(strokeData, function(strokeDatum) {
-            return strokeDatum.id === id;
-        })[0];
-        
-        redoStrokes.push(strokeDatum);
-        reloadCanvas();
-        this.emit("undo", strokeDatum.id);
-        
+    undo: function () {
+        if (myStrokeIds.length) {
+            var id = myStrokeIds.pop();
+            var strokeDatum = _.remove(strokeData, function(strokeDatum) {
+                return strokeDatum.id === id;
+            })[0];
+            
+            redoStrokes.push(strokeDatum);
+            reloadCanvas();
+            this.emit("undo", strokeDatum.id);
+        }
     },
     redo: function () {
         if (redoStrokes.length) {
-            this.paint(redoStrokes.pop());
+            this.paint(redoStrokes.pop(), false);
         }
     }
 }
@@ -90,7 +104,6 @@ stateActions.getInitialData();
 /* Listeners */
 socket.on("serverImageData", function (data) {
     strokeData = JSON.parse(data).imageData;
-    console.log("strokeData", strokeData);
     reloadCanvas();
 });
 
@@ -110,7 +123,7 @@ var Menu = function() {
 
     function createMenu() {
         var width = menuAttrs.width;
-        var height = menuAttrs.height;
+        var height = menuAttrs.height;        
 
         var exitRadius = 20;
         var outerRadius = 60;
@@ -243,8 +256,7 @@ var Menu = function() {
             .attr("y", 0 - (20/2))
             .style("pointer-events", "none")
 
-        var menuPieSlices = menu.append("g");
-        var sectionPieSliceGroups = menuPieSlices.selectAll("path.menu")
+        var sectionPieSliceGroups = menu.selectAll("path.menu")
                                                  .data(pie(menuData))
                                                  .enter()
                                                  .append("g");
@@ -265,10 +277,13 @@ var Menu = function() {
                                      activeSections[obj.data.tag] = obj.data.id;
                                      d3.selectAll(".active")
                                        .classed("active", false)
-                                       .style("filter", null);
+                                       .style("filter", null)
+                                       .moveToBack()
 
                                      activateActiveSections(activeSections);    
-                                 }                                
+                                 }
+
+                                 refresh();
                              });
 
         // draw undo redo icons
@@ -344,11 +359,27 @@ var Menu = function() {
         return svg;
     }
 
+    var hasOpenedMenu = false;
     function openMenu(x, y) {
+        if (!hasOpenedMenu) {
+            hasOpenedMenu = true;
+            $("#helpText").hide();
+        }
+
+        refresh();
+        
         menuElement.style("display", "block")
                    .style("position", "absolute")
                    .style("left", (x - menuAttrs.width/2) + "px")
                    .style("top", (y - menuAttrs.height/2) + "px");
+    }
+
+    function refresh () {
+        d3.select("." + makeValidSelector("undo"))
+          .classed("notAvailable", !myStrokeIds.length)
+        
+        d3.select("." + makeValidSelector("redo"))
+          .classed("notAvailable", !redoStrokes.length);
     }
 
     function hideMenu() {
@@ -396,7 +427,7 @@ var mouseIsDown = false;
 d3.select(frontCanvasEl).on("mousemove", function() {
     var e = d3.event;
     if (mouseIsDown) {
-        points.push([e.clientX, e.clientY]);
+        points.push([e.offsetX, e.offsetY]);
         drawLineToCanvas(frontCtx, points, menu.activeSections, true);
     }
     /* if want to draw the cursor  */
@@ -414,12 +445,12 @@ d3.select(frontCanvasEl).on("mousedown", function() {
     else if ("button" in e)  // IE, Opera 
         isRightMB = e.button == 2;
     if (isRightMB) {
-        menu.open(e.clientX, e.clientY);
+        menu.open(e.offsetX, e.offsetY);
     } else if (menu.isOpen) {
         menu.close();
     } else {
         mouseIsDown = true;
-        points.push([e.clientX, e.clientY]);
+        points.push([e.offsetX, e.offsetY]);
         drawLineToCanvas(frontCtx, points, menu.activeSections, true);
     }
 });
@@ -525,11 +556,6 @@ function reloadCanvas() {
 $(document).ready(function(){
     var front = $(frontCanvas);
     var back = $(backCanvas);
-
-    /*
-    var ct = c.get(0).getContext('2d');
-    */
-
     var container = $(front).parent();
 
     //Run function when browser resizes
@@ -538,11 +564,13 @@ $(document).ready(function(){
     function respondCanvas(){
         canvasWidth = $(container).width();
         canvasHeight = $(container).height();
-        front.attr('width', canvasWidth); //max width
-        front.attr('height', canvasHeight); //max height
+        var padding = 10 * 2;
+        
+        front.attr('width', canvasWidth - padding);
+        front.attr('height', canvasHeight - padding);
 
-        back.attr('width', canvasWidth); //max width
-        back.attr('height', canvasHeight); //max height
+        back.attr('width', canvasWidth - padding);
+        back.attr('height', canvasHeight - padding);
 
         if (resizeTimer) {
             clearTimeout(resizeTimer);
@@ -558,20 +586,20 @@ $(document).ready(function(){
 
 /*
    Things to do:
-   
-   - Fix ordering of menu
-   - Fix height and width
-   - Add a border that looks good in notion
-   - Add right click for menu text
    - Make landing page
-   - Gray out if can't undo or redo
+
+   - Fix height and width scaling
+   - Fix text postitioning
+   - Fix text getting covered by paint
+   
    - Change drawing algo to not skip no matter how much time is spent drawing
-   - Fix menu 
-   - Add animations to menu
-   - Deploy onto server
    - Set data to background picture
    - Refactor globals in code
+   - Add animations to menu
+   - Send data as drawing
+   - Deploy onto server
 
+   
 */
 
 
